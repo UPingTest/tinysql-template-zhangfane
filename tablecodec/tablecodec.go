@@ -16,6 +16,7 @@ package tablecodec
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"time"
 
@@ -71,7 +72,16 @@ func EncodeRowKeyWithHandle(tableID int64, handle int64) kv.Key {
 
 // DecodeRecordKey decodes the key and gets the tableID, handle.
 func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
-	/* Your code here */
+	tableID = DecodeTableID(key)
+	if tableID == 0 {
+		err = fmt.Errorf("the key %v can not find tableID", tableID)
+		return
+	}
+	key = key[bytes.Index(key, recordPrefixSep):][len(recordPrefixSep):]
+	_, handle, err = codec.DecodeInt(key)
+	if err != nil {
+		return 0, 0, err
+	}
 	return
 }
 
@@ -94,7 +104,16 @@ func EncodeIndexSeekKey(tableID int64, idxID int64, encodedValue []byte) kv.Key 
 
 // DecodeIndexKeyPrefix decodes the key and gets the tableID, indexID, indexValues.
 func DecodeIndexKeyPrefix(key kv.Key) (tableID int64, indexID int64, indexValues []byte, err error) {
-	/* Your code here */
+	tableID = DecodeTableID(key)
+	if tableID == 0 {
+		err = fmt.Errorf("the key %v can not find tableID", tableID)
+		return
+	}
+	key = key[bytes.Index(key, indexPrefixSep):][len(indexPrefixSep):]
+	indexValues, indexID, err = codec.DecodeInt(key)
+	if err != nil {
+		return
+	}
 	return tableID, indexID, indexValues, nil
 }
 
@@ -226,7 +245,9 @@ func DecodeTableID(key kv.Key) int64 {
 	}
 	key = key[len(tablePrefix):]
 	_, tableID, err := codec.DecodeInt(key)
-	// TODO: return error.
+	if err != nil {
+		return 0
+	}
 	terror.Log(errors.Trace(err))
 	return tableID
 }
